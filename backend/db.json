@@ -1,0 +1,34 @@
+{
+  "students": [
+    {
+      "id": "d9dc",
+      "name": "vipul sahu",
+      "rollNumber": "789398",
+      "department": "cse",
+      "year": "2025"
+    },
+    {
+      "id": "ca9d",
+      "name": "Arun",
+      "rollNumber": "69283",
+      "department": "Arch",
+      "year": "2027"
+    },
+    {
+      "id": "2347",
+      "name": "noor",
+      "rollNumber": "3424",
+      "department": "cse",
+      "year": "2025"
+    }
+  ],
+  "users": [
+    {
+      "id": "52e9",
+      "email": "vipulsahu@gmail.com",
+      "password": "pass",
+      "role": "admin"
+    }
+  ]
+
+}

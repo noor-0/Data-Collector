@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { firestore } from './firebaseConfig';
-
 import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 const AdminView = () => {
   const [students, setStudents] = useState([]);
@@ -10,7 +11,6 @@ const AdminView = () => {
   const [selectedSchool, setSelectedSchool] = useState('');
   const [schoolList, setSchoolList] = useState([]);
 
-  // 🔁 Fetch all students from Firestore
   useEffect(() => {
     const fetchStudents = async () => {
       try {
@@ -19,11 +19,9 @@ const AdminView = () => {
 
         setStudents(studentData);
 
-        // Extract unique school names
         const schools = [...new Set(studentData.map((s) => s.schoolName))];
         setSchoolList(schools);
 
-        // Optionally auto-select the first school
         if (schools.length > 0 && !selectedSchool) {
           setSelectedSchool(schools[0]);
         }
@@ -33,46 +31,90 @@ const AdminView = () => {
     };
 
     fetchStudents();
-  }, []);
+  }, [selectedSchool]);
 
- 
-const handleDownload = () => {
-  if (filteredStudents.length === 0) {
-    alert('No students to download.');
-    return;
-  }
-
-  // Prepare data for Excel
-  const dataForExcel = filteredStudents.map(student => ({
-    Name: student.name,
-    Roll_Number: student.rollNumber,
-    Department: student.department,
-    Year: student.year,
-    Class: student.className,
-    Section: student.section,
-    School: student.schoolName,
-    Timestamp: new Date(student.timestamp?.seconds * 1000).toLocaleString(), // Convert Firestore timestamp
-  }));
-
-  // Create worksheet
-  const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
-
-  // Create workbook
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
-
-  // Download
-  XLSX.writeFile(workbook, `students-${selectedSchool || 'all'}.xlsx`);
-};
+  const filteredStudents = selectedSchool
+    ? students.filter((s) => s.schoolName === selectedSchool)
+    : [];
 
   const toggleExpand = (index) => {
     setExpandedIndex(expandedIndex === index ? null : index);
   };
 
-  // 🧠 Filter students by selected school
-  const filteredStudents = selectedSchool
-    ? students.filter((s) => s.schoolName === selectedSchool)
-    : [];
+  const handleDownload = async () => {
+    if (filteredStudents.length === 0) {
+      alert('No students to download.');
+      return;
+    }
+
+    // Prepare Excel data (image URLs as text)
+    const dataForExcel = filteredStudents.map(student => ({
+      Name: student.name,
+      Roll_Number: student.rollNumber,
+      Department: student.department,
+      Year: student.year,
+      Class: student.className,
+      Section: student.section,
+      School: student.schoolName,
+      Image_URL: student.image || 'No Image',
+      Timestamp: student.timestamp
+        ? new Date(student.timestamp.seconds * 1000).toLocaleString()
+        : '',
+    }));
+
+    // Create worksheet & workbook
+    const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+    // Create ZIP archive
+    const zip = new JSZip();
+
+    // Add Excel file to ZIP
+    zip.file(`students-${selectedSchool || 'all'}.xlsx`, excelBuffer);
+
+    // Folder for images inside ZIP
+    const imgFolder = zip.folder('student_images');
+
+    // Fetch each image and add to ZIP
+    // Filter only students with image URL
+    const studentsWithImages = filteredStudents.filter((s) => s.image);
+
+    // Fetch images as blobs and add to zip folder
+    await Promise.all(
+      studentsWithImages.map(async (student, idx) => {
+        try {
+          const response = await fetch(student.image);
+          if (!response.ok) {
+            console.warn(`Failed to fetch image for ${student.name}: ${response.statusText}`);
+            return;
+          }
+          const blob = await response.blob();
+
+          // Extract image file extension from URL or fallback to jpg
+          let ext = 'jpg';
+          const urlParts = student.image.split('.');
+          if (urlParts.length > 1) {
+            const lastPart = urlParts[urlParts.length - 1].split('?')[0];
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(lastPart.toLowerCase())) {
+              ext = lastPart.toLowerCase();
+            }
+          }
+
+          // Add image file to zip
+          const safeName = student.name.replace(/\s+/g, '_').toLowerCase();
+          imgFolder.file(`${safeName}_${idx + 1}.${ext}`, blob);
+        } catch (err) {
+          console.error('Error fetching image:', err);
+        }
+      })
+    );
+
+    // Generate ZIP and trigger download
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    saveAs(zipBlob, `students_data_${selectedSchool || 'all'}.zip`);
+  };
 
   return (
     <div
@@ -84,7 +126,7 @@ const handleDownload = () => {
     >
       <h2 className="text-2xl font-bold mb-4 text-center">Admin Panel</h2>
 
-      {/* 🔽 Select School Dropdown */}
+      {/* School selector */}
       <div className="mb-6">
         <label className="block mb-2 font-medium">Select School:</label>
         <select
@@ -109,7 +151,6 @@ const handleDownload = () => {
         </select>
       </div>
 
-      {/* 👥 Show Students */}
       {selectedSchool && (
         <>
           <div className="flex justify-between items-center mb-6">
@@ -122,7 +163,7 @@ const handleDownload = () => {
               }}
               className="px-4 py-2 rounded text-sm shadow hover:opacity-90 transition"
             >
-              Download Student Info
+              Download Student Info & Images
             </button>
           </div>
 
@@ -148,6 +189,13 @@ const handleDownload = () => {
                   className="p-4 rounded-lg shadow-sm cursor-pointer"
                 >
                   <p className="font-semibold mb-2">{student.name}</p>
+                  {student.image && (
+                    <img
+                      src={student.image}
+                      alt={`${student.name}'s profile`}
+                      className="mb-2 max-h-24 object-contain rounded"
+                    />
+                  )}
                   {expandedIndex === index && (
                     <div className="space-y-1 text-sm">
                       <p><strong>Roll Number:</strong> {student.rollNumber}</p>

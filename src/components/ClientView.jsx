@@ -1,9 +1,7 @@
-import React, { useState } from 'react'
-import { collection, addDoc } from "firebase/firestore";
-import { firestore } from "./firebaseConfig"; // adjust path as needed
+import React, { useState } from 'react';
+import { collection, addDoc } from 'firebase/firestore';
+import { firestore } from './firebaseConfig';
 
-
-// Common inline styles
 const inputStyle = {
   backgroundColor: 'var(--bg-color)',
   color: 'var(--text-color)',
@@ -15,17 +13,28 @@ const buttonStyle = {
   color: 'var(--button-text)',
 };
 
-/**
- * StepForm: Handles rendering input fields and navigation buttons
- * for the current step in the multi-step form.
- */
+// 🔁 Upload to ImgBB helper
+const handleUploadToImgBB = async (file) => {
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const res = await fetch('https://api.imgbb.com/1/upload?key=f65c528386eeec4a1ea437f29269d63a', {
+    method: 'POST',
+    body: formData,
+  });
+
+  const data = await res.json();
+  return data.data.url; // ✅ Return hosted image URL
+};
+
+// 🔄 Step-by-step form renderer
 const StepForm = ({
   step,
   schoolName, setSchoolName,
   className, setClassName,
   section, setSection,
   student, handleStudentChange,
-  setStep, handleSubmit
+  setStep, handleSubmit,
 }) => {
   switch (step) {
     case 1:
@@ -112,7 +121,6 @@ const StepForm = ({
     case 4:
       return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {/* Student details fields */}
           {['name', 'rollNumber', 'department', 'year'].map((field) => (
             <div key={field}>
               <label>{field[0].toUpperCase() + field.slice(1)}</label>
@@ -127,7 +135,6 @@ const StepForm = ({
             </div>
           ))}
 
-          {/* File input for student image */}
           <label>Student Image</label>
           <input
             type="file"
@@ -153,12 +160,9 @@ const StepForm = ({
   }
 };
 
-/**
- * ClientView: Multi-step form to collect student details including school,
- * class, section, and individual student information.
- */
-const ClientView = ({ onAddStudent }) => {
-  const [step, setStep] = useState(1); // Current step
+// 📋 Main ClientView component
+const ClientView = () => {
+  const [step, setStep] = useState(1);
   const [schoolName, setSchoolName] = useState('');
   const [className, setClassName] = useState('');
   const [section, setSection] = useState('');
@@ -170,7 +174,6 @@ const ClientView = ({ onAddStudent }) => {
     image: null,
   });
 
-  // Handles both text and file changes for student object
   const handleStudentChange = ({ target: { name, value, files } }) => {
     setStudent((prev) => ({
       ...prev,
@@ -178,28 +181,33 @@ const ClientView = ({ onAddStudent }) => {
     }));
   };
 
-  // Handles form submission (add actual logic as needed)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+    try {
+      let imageUrl = null;
+      if (student.image) {
+        imageUrl = await handleUploadToImgBB(student.image);
+      }
 
-  try {
-    await addDoc(collection(firestore, "students"), {
-      schoolName,
-      className,
-      section,
-      ...student,
-      image: student.image ? student.image.name : null, // Or image URL if uploaded
-      timestamp: new Date(),
-    });
+      await addDoc(collection(firestore, 'students'), {
+        schoolName,
+        className,
+        section,
+        ...student,
+        image: imageUrl || null,
+        timestamp: new Date(),
+      });
 
-    alert("Student data saved to Firestore!");
-    // reset form or redirect if needed
-  } catch (error) {
-    console.error("Error writing to Firestore:", error);
-    alert("Failed to save student data.");
-  }
-};
+      alert('Student data saved successfully!');
+      // Optional: reset form or step
+      setStep(1);
+      setStudent({ name: '', rollNumber: '', department: '', year: '', image: null });
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload student data.');
+    }
+  };
 
   return (
     <div
@@ -224,7 +232,6 @@ const handleSubmit = async (e) => {
         </div>
       </div>
 
-      {/* Render the current step form */}
       <StepForm
         step={step}
         schoolName={schoolName}

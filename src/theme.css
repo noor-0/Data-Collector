@@ -1,0 +1,39 @@
+/* src/theme.css */
+:root {
+  --bg-color: #f1f5f9;
+  --text-color: #1e3a8a;
+  --header-bg: #ffffff;
+  --button-bg: #2563eb;
+  --button-text: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.7);
+  --footer-bg: #ffffff;
+}
+
+body.dark {
+  --bg-color: #1f2937;
+  --text-color: #ffffff;
+  --header-bg: #111827;
+  --button-bg: #3b82f6;
+  --button-text: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --footer-bg: #111827;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.firebaseui-container .firebaseui-idp-button {
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border-radius: 0.5rem;
+  font-weight: bold;
+  padding: 0.75rem 1.25rem;
+  margin-top: 1rem;
+  transition: opacity 0.3s;
+}
+.firebaseui-container .firebaseui-idp-button:hover {
+  opacity: 0.9;
+}
